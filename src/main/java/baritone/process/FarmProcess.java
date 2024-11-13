@@ -65,6 +65,8 @@ import java.util.function.Predicate;
 public final class FarmProcess extends BaritoneProcessHelper implements IFarmProcess {
 
     private boolean active;
+    private boolean paused;
+    private Long time;
 
     private List<BlockPos> locations;
     private int tickCount;
@@ -110,6 +112,20 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
     }
 
     @Override
+    public void pause() {
+        this.paused = true;
+    }
+
+    @Override
+    public void resume() {
+        this.paused = false;
+    }
+
+    public boolean isPaused() {
+        return this.paused;
+    }
+
+    @Override
     public void farm(int range, BlockPos pos) {
         if (pos == null) {
             center = baritone.getPlayerContext().playerFeet();
@@ -119,6 +135,14 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
         this.range = range;
         active = true;
         locations = null;
+    }
+
+    public Long getTime() {
+        return time;
+    }
+
+    public void setTime(Long time) {
+        this.time = time;
     }
 
     private enum Harvest {
@@ -220,6 +244,10 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
         if (locations == null) {
             return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
         }
+        // Farm Continuously: Block pathing while paused
+        if (isPaused() && System.currentTimeMillis() < getTime()) {
+            return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
+        }
         List<BlockPos> toBreak = new ArrayList<>();
         List<BlockPos> openFarmland = new ArrayList<>();
         List<BlockPos> bonemealable = new ArrayList<>();
@@ -266,55 +294,36 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
             }
         }
 
-        baritone.getInputOverrideHandler().clearAllKeys();
-        BetterBlockPos playerPos = ctx.playerFeet();
-        double blockReachDistance = ctx.playerController().getBlockReachDistance();
-        for (BlockPos pos : toBreak) {
-            if (playerPos.distSqr(pos) > blockReachDistance * blockReachDistance) {
-                continue;
-            }
-            Optional<Rotation> rot = RotationUtils.reachable(ctx, pos);
-            if (rot.isPresent() && isSafeToCancel) {
-                baritone.getLookBehavior().updateTarget(rot.get(), true);
-                MovementHelper.switchToBestToolFor(ctx, ctx.world().getBlockState(pos));
-                if (ctx.isLookingAt(pos)) {
-                    baritone.getInputOverrideHandler().setInputForceState(Input.CLICK_LEFT, true);
+        // Farm Continuously: Block input while paused
+        if (!isPaused()) {
+            baritone.getInputOverrideHandler().clearAllKeys();
+            BetterBlockPos playerPos = ctx.playerFeet();
+            double blockReachDistance = ctx.playerController().getBlockReachDistance();
+            for (BlockPos pos : toBreak) {
+                if (playerPos.distSqr(pos) > blockReachDistance * blockReachDistance) {
+                    continue;
                 }
-                return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
-            }
-        }
-        ArrayList<BlockPos> both = new ArrayList<>(openFarmland);
-        both.addAll(openSoulsand);
-        for (BlockPos pos : both) {
-            if (playerPos.distSqr(pos) > blockReachDistance * blockReachDistance) {
-                continue;
-            }
-            boolean soulsand = openSoulsand.contains(pos);
-            Optional<Rotation> rot = RotationUtils.reachableOffset(ctx, pos, new Vec3(pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5), blockReachDistance, false);
-            if (rot.isPresent() && isSafeToCancel && baritone.getInventoryBehavior().throwaway(true, soulsand ? this::isNetherWart : this::isPlantable)) {
-                HitResult result = RayTraceUtils.rayTraceTowards(ctx.player(), rot.get(), blockReachDistance);
-                if (result instanceof BlockHitResult && ((BlockHitResult) result).getDirection() == Direction.UP) {
+                Optional<Rotation> rot = RotationUtils.reachable(ctx, pos);
+                if (rot.isPresent() && isSafeToCancel) {
                     baritone.getLookBehavior().updateTarget(rot.get(), true);
+                    MovementHelper.switchToBestToolFor(ctx, ctx.world().getBlockState(pos));
                     if (ctx.isLookingAt(pos)) {
-                        baritone.getInputOverrideHandler().setInputForceState(Input.CLICK_RIGHT, true);
+                        baritone.getInputOverrideHandler().setInputForceState(Input.CLICK_LEFT, true);
                     }
                     return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
                 }
             }
-        }
-        for (BlockPos pos : openLog) {
-            if (playerPos.distSqr(pos) > blockReachDistance * blockReachDistance) {
-                continue;
-            }
-            for (Direction dir : Direction.Plane.HORIZONTAL) {
-                if (!(ctx.world().getBlockState(pos.relative(dir)).getBlock() instanceof AirBlock)) {
+            ArrayList<BlockPos> both = new ArrayList<>(openFarmland);
+            both.addAll(openSoulsand);
+            for (BlockPos pos : both) {
+                if (playerPos.distSqr(pos) > blockReachDistance * blockReachDistance) {
                     continue;
                 }
-                Vec3 faceCenter = Vec3.atCenterOf(pos).add(Vec3.atLowerCornerOf(dir.getNormal()).scale(0.5));
-                Optional<Rotation> rot = RotationUtils.reachableOffset(ctx, pos, faceCenter, blockReachDistance, false);
-                if (rot.isPresent() && isSafeToCancel && baritone.getInventoryBehavior().throwaway(true, this::isCocoa)) {
+                boolean soulsand = openSoulsand.contains(pos);
+                Optional<Rotation> rot = RotationUtils.reachableOffset(ctx, pos, new Vec3(pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5), blockReachDistance, false);
+                if (rot.isPresent() && isSafeToCancel && baritone.getInventoryBehavior().throwaway(true, soulsand ? this::isNetherWart : this::isPlantable)) {
                     HitResult result = RayTraceUtils.rayTraceTowards(ctx.player(), rot.get(), blockReachDistance);
-                    if (result instanceof BlockHitResult && ((BlockHitResult) result).getDirection() == dir) {
+                    if (result instanceof BlockHitResult && ((BlockHitResult) result).getDirection() == Direction.UP) {
                         baritone.getLookBehavior().updateTarget(rot.get(), true);
                         if (ctx.isLookingAt(pos)) {
                             baritone.getInputOverrideHandler().setInputForceState(Input.CLICK_RIGHT, true);
@@ -323,27 +332,51 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
                     }
                 }
             }
-        }
-        for (BlockPos pos : bonemealable) {
-            if (playerPos.distSqr(pos) > blockReachDistance * blockReachDistance) {
-                continue;
-            }
-            Optional<Rotation> rot = RotationUtils.reachable(ctx, pos);
-            if (rot.isPresent() && isSafeToCancel && baritone.getInventoryBehavior().throwaway(true, this::isBoneMeal)) {
-                baritone.getLookBehavior().updateTarget(rot.get(), true);
-                if (ctx.isLookingAt(pos)) {
-                    baritone.getInputOverrideHandler().setInputForceState(Input.CLICK_RIGHT, true);
+            for (BlockPos pos : openLog) {
+                if (playerPos.distSqr(pos) > blockReachDistance * blockReachDistance) {
+                    continue;
                 }
-                return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
+                for (Direction dir : Direction.Plane.HORIZONTAL) {
+                    if (!(ctx.world().getBlockState(pos.relative(dir)).getBlock() instanceof AirBlock)) {
+                        continue;
+                    }
+                    Vec3 faceCenter = Vec3.atCenterOf(pos).add(Vec3.atLowerCornerOf(dir.getNormal()).scale(0.5));
+                    Optional<Rotation> rot = RotationUtils.reachableOffset(ctx, pos, faceCenter, blockReachDistance, false);
+                    if (rot.isPresent() && isSafeToCancel && baritone.getInventoryBehavior().throwaway(true, this::isCocoa)) {
+                        HitResult result = RayTraceUtils.rayTraceTowards(ctx.player(), rot.get(), blockReachDistance);
+                        if (result instanceof BlockHitResult && ((BlockHitResult) result).getDirection() == dir) {
+                            baritone.getLookBehavior().updateTarget(rot.get(), true);
+                            if (ctx.isLookingAt(pos)) {
+                                baritone.getInputOverrideHandler().setInputForceState(Input.CLICK_RIGHT, true);
+                            }
+                            return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
+                        }
+                    }
+                }
+            }
+            for (BlockPos pos : bonemealable) {
+                if (playerPos.distSqr(pos) > blockReachDistance * blockReachDistance) {
+                    continue;
+                }
+                Optional<Rotation> rot = RotationUtils.reachable(ctx, pos);
+                if (rot.isPresent() && isSafeToCancel && baritone.getInventoryBehavior().throwaway(true, this::isBoneMeal)) {
+                    baritone.getLookBehavior().updateTarget(rot.get(), true);
+                    if (ctx.isLookingAt(pos)) {
+                        baritone.getInputOverrideHandler().setInputForceState(Input.CLICK_RIGHT, true);
+                    }
+                    return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
+                }
             }
         }
 
         if (calcFailed) {
-            logDirect("Farm failed");
-            if (Baritone.settings().notificationOnFarmFail.value) {
-                logNotification("Farm failed", true);
+            if (!Baritone.settings().farmContinuously.value) {
+                logDirect("Farm failed");
+                if (Baritone.settings().notificationOnFarmProcess.value) {
+                    logNotification("Farm failed", true);
+                }
+                onLostControl();
             }
-            onLostControl();
             return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
         }
 
@@ -384,13 +417,36 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
                 }
             }
         }
-        if (goalz.isEmpty()) {
-            logDirect("Farm failed");
-            if (Baritone.settings().notificationOnFarmFail.value) {
-                logNotification("Farm failed", true);
+        if (goalz.isEmpty() && !isPaused()) {
+            if (!Baritone.settings().farmContinuously.value) {
+                logDirect("Farm failed");
+                if (Baritone.settings().notificationOnFarmProcess.value) {
+                    logNotification("Farm failed", true);
+                }
+                onLostControl();
+                return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
             }
-            onLostControl();
+            // Farm Continuously: Begin pause state after no goals detected
+            pause();
+            setTime(System.currentTimeMillis() + (Baritone.settings().farmContinuouslyIntervalSecs.value * 1000));
+            logDirect("Farm standby");
+            if (Baritone.settings().notificationOnFarmProcess.value) {
+                logNotification("Farm standby", false);
+            }
             return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
+        }
+        if (isPaused()) {
+            // Farm Continuously: Reset the interval if the amount of goals can't fulfill the threshold
+            if (goalz.size() < Baritone.settings().farmContinuouslyThreshold.value) {
+                setTime(System.currentTimeMillis() + (Baritone.settings().farmContinuouslyIntervalSecs.value * 1000));
+                return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
+            }
+            // Farm Continuously: Resume farming
+            resume();
+            logDirect("Found " + goalz.size() + " task, farming");
+            if (Baritone.settings().notificationOnFarmProcess.value) {
+                logNotification("Found " + goalz.size() + " task, farming", false);
+            }
         }
         return new PathingCommand(new GoalComposite(goalz.toArray(new Goal[0])), PathingCommandType.SET_GOAL_AND_PATH);
     }

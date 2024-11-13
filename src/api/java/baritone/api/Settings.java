@@ -982,6 +982,22 @@ public final class Settings {
     public final Setting<Integer> farmMaxScanSize = new Setting<>(256);
 
     /**
+     * true = farm farm farm, i don't want to stop!
+            * false = allow farm to stop or fail
+     */
+    public final Setting<Boolean> farmContinuously = new Setting<>(false);
+
+    /**
+     * How much farming task is enough for the Continuous Farm to resume?
+     */
+    public final Setting<Integer> farmContinuouslyThreshold = new Setting<>(16);
+
+    /**
+     * Time interval (in seconds) for the Continuous Farm to check if threshold is fulfilled?
+     */
+    public final Setting<Long> farmContinuouslyIntervalSecs = new Setting<>(TimeUnit.MINUTES.toSeconds(2));
+
+    /**
      * When the cache scan gives less blocks than the maximum threshold (but still above zero), scan the main world too.
      * <p>
      * Only if you have a beefy CPU and automatically mine blocks that are in cache
@@ -1397,7 +1413,7 @@ public final class Settings {
     /**
      * Desktop notification on farm fail
      */
-    public final Setting<Boolean> notificationOnFarmFail = new Setting<>(true);
+    public final Setting<Boolean> notificationOnFarmProcess = new Setting<>(true);
 
     /**
      * Desktop notification on build finished
