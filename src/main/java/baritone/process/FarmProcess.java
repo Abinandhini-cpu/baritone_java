@@ -379,8 +379,8 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
             if (entity instanceof ItemEntity && entity.onGround()) {
                 ItemEntity ei = (ItemEntity) entity;
                 if (PICKUP_DROPPED.contains(ei.getItem().getItem())) {
-                    // +0.1 because of farmland's 0.9375 dummy height lol
-                    goalz.add(new GoalBlock(new BetterBlockPos(entity.position().x, entity.position().y + 0.1, entity.position().z)));
+                    // +0.1 because of farmland's 0.9375 and soulsand's 0.875 dummy height lol
+                    goalz.add(new GoalBlock(new BetterBlockPos(entity.position().x, entity.position().y + 0.125, entity.position().z)));
                 }
             }
         }
