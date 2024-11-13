@@ -982,6 +982,11 @@ public final class Settings {
     public final Setting<Integer> farmMaxScanSize = new Setting<>(256);
 
     /**
+     * Prioritize gathering farm related drops
+     */
+    public final Setting<Boolean> farmPrioritizeGather = new Setting<>(false);
+
+    /**
      * true = farm farm farm, i don't want to stop!
             * false = allow farm to stop or fail
      */

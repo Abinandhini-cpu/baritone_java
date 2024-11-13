@@ -296,6 +296,18 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
 
         // Farm Continuously: Block input while paused
         if (!isPaused()) {
+            // Check if item gather is prioritized
+            if (Baritone.settings().farmPrioritizeGather.value) {
+                for (Entity entity : ctx.entities()) {
+                    if (entity instanceof ItemEntity && entity.onGround()) {
+                        ItemEntity ei = (ItemEntity) entity;
+                        if (PICKUP_DROPPED.contains(ei.getItem().getItem())) {
+                            // +0.1 because of farmland's 0.9375 and soulsand's 0.875 dummy height lol
+                            return new PathingCommand(new GoalBlock(new BetterBlockPos(entity.position().x, entity.position().y + 0.125, entity.position().z)), PathingCommandType.SET_GOAL_AND_PATH);
+                        }
+                    }
+                }
+            }
             baritone.getInputOverrideHandler().clearAllKeys();
             BetterBlockPos playerPos = ctx.playerFeet();
             double blockReachDistance = ctx.playerController().getBlockReachDistance();
