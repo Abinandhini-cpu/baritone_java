@@ -445,7 +445,7 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
             if (Baritone.settings().notificationOnFarmProcess.value) {
                 logNotification("Farm standby", false);
             }
-            return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
+            return new PathingCommand(null, PathingCommandType.SET_GOAL_AND_PATH);
         }
         if (isPaused()) {
             // Farm Continuously: Reset the interval if the amount of goals can't fulfill the threshold
@@ -466,6 +466,8 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
     @Override
     public void onLostControl() {
         active = false;
+        this.paused = false;
+        this.time = null;
     }
 
     @Override
