@@ -298,14 +298,18 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
         if (!isPaused()) {
             // Check if item gather is prioritized
             if (Baritone.settings().farmPrioritizeGather.value) {
+                List<Goal> pickupGoals = new ArrayList<>();
                 for (Entity entity : ctx.entities()) {
                     if (entity instanceof ItemEntity && entity.onGround()) {
                         ItemEntity ei = (ItemEntity) entity;
                         if (PICKUP_DROPPED.contains(ei.getItem().getItem())) {
                             // +0.1 because of farmland's 0.9375 and soulsand's 0.875 dummy height lol
-                            return new PathingCommand(new GoalBlock(new BetterBlockPos(entity.position().x, entity.position().y + 0.125, entity.position().z)), PathingCommandType.SET_GOAL_AND_PATH);
+                            pickupGoals.add(new GoalBlock(new BetterBlockPos(entity.position().x, entity.position().y + 0.125, entity.position().z)));
                         }
                     }
+                }
+                if (!(pickupGoals.isEmpty())) {
+                    return new PathingCommand(new GoalComposite(pickupGoals.toArray(new Goal[0])), PathingCommandType.SET_GOAL_AND_PATH);
                 }
             }
             baritone.getInputOverrideHandler().clearAllKeys();
