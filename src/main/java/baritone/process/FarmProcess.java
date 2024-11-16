@@ -300,6 +300,10 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
             if (Baritone.settings().farmPrioritizeGather.value) {
                 List<Goal> pickupGoals = new ArrayList<>();
                 for (Entity entity : ctx.entities()) {
+                    //check if the pickupGoals is out of range.
+                    if (range != 0 && entity.blockPosition().distSqr(center) > range * range) {
+                        continue;
+                    }
                     if (entity instanceof ItemEntity && entity.onGround()) {
                         ItemEntity ei = (ItemEntity) entity;
                         if (PICKUP_DROPPED.contains(ei.getItem().getItem())) {
@@ -425,6 +429,10 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
             }
         }
         for (Entity entity : ctx.entities()) {
+            //check if the pickupGoals is out of range.
+            if (range != 0 && entity.blockPosition().distSqr(center) > range * range) {
+                continue;
+            }
             if (entity instanceof ItemEntity && entity.onGround()) {
                 ItemEntity ei = (ItemEntity) entity;
                 if (PICKUP_DROPPED.contains(ei.getItem().getItem())) {
