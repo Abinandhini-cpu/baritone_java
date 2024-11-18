@@ -56,10 +56,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Predicate;
 
 public final class FarmProcess extends BaritoneProcessHelper implements IFarmProcess {
@@ -101,6 +98,31 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
             Blocks.BAMBOO.asItem(),
             Blocks.CACTUS.asItem()
     );
+
+    private static final Map<Block, Item> CROP_TO_PLANTABLE = new HashMap<>();
+    static {
+        CROP_TO_PLANTABLE.put(Blocks.BEETROOTS, Items.BEETROOT_SEEDS);
+        CROP_TO_PLANTABLE.put(Blocks.WHEAT, Items.WHEAT_SEEDS);
+        CROP_TO_PLANTABLE.put(Blocks.CARROTS, Items.CARROT);
+        CROP_TO_PLANTABLE.put(Blocks.POTATOES, Items.POTATO);
+        CROP_TO_PLANTABLE.put(Blocks.MELON, Items.MELON_SEEDS);
+        CROP_TO_PLANTABLE.put(Blocks.PUMPKIN, Items.PUMPKIN_SEEDS);
+    }
+
+    private static final Map<Block, List<Item>> CROP_TO_DROPPED = new HashMap<>();
+    static {
+        CROP_TO_DROPPED.put(Blocks.BEETROOTS, Arrays.asList(Items.BEETROOT, Items.BEETROOT_SEEDS));
+        CROP_TO_DROPPED.put(Blocks.WHEAT, Arrays.asList(Items.WHEAT, Items.WHEAT_SEEDS));
+        CROP_TO_DROPPED.put(Blocks.CARROTS, List.of(Items.CARROT));
+        CROP_TO_DROPPED.put(Blocks.POTATOES, List.of(Items.POTATO));
+        CROP_TO_DROPPED.put(Blocks.MELON, Arrays.asList(Items.MELON_SEEDS, Items.MELON_SLICE));
+        CROP_TO_DROPPED.put(Blocks.PUMPKIN, Arrays.asList(Items.PUMPKIN, Items.PUMPKIN_SEEDS));
+        CROP_TO_DROPPED.put(Blocks.NETHER_WART, List.of(Items.NETHER_WART));
+        CROP_TO_DROPPED.put(Blocks.COCOA, List.of(Items.COCOA_BEANS));
+        CROP_TO_DROPPED.put(Blocks.SUGAR_CANE, List.of(Items.SUGAR_CANE));
+        CROP_TO_DROPPED.put(Blocks.BAMBOO, List.of(Items.BAMBOO));
+        CROP_TO_DROPPED.put(Blocks.CACTUS, List.of(Items.CACTUS));
+    }
 
     public FarmProcess(Baritone baritone) {
         super(baritone);
@@ -202,14 +224,35 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
     private boolean readyForHarvest(Level world, BlockPos pos, BlockState state) {
         for (Harvest harvest : Harvest.values()) {
             if (harvest.block == state.getBlock()) {
-                return harvest.readyToHarvest(world, pos, state);
+                if (!Baritone.settings().farmEnableWhitelist.value) {
+                    return harvest.readyToHarvest(world, pos, state);
+                } else {
+                    for (Block whitelist : Baritone.settings().farmWhitelist.value) {
+                        if ((harvest.block.equals(whitelist)) && (harvest.block == state.getBlock())) {
+                            return harvest.readyToHarvest(world, pos, state);
+                        }
+                    }
+                }
             }
         }
         return false;
     }
 
     private boolean isPlantable(ItemStack stack) {
-        return FARMLAND_PLANTABLE.contains(stack.getItem());
+        if (!Baritone.settings().farmEnableWhitelist.value) {
+            return FARMLAND_PLANTABLE.contains(stack.getItem());
+        }
+        if (!FARMLAND_PLANTABLE.contains(stack.getItem())) {
+            return false;
+        } else {
+            List<Item> whitelistedFarmlandPlantable = new ArrayList<>();
+            for (Block whitelist : Baritone.settings().farmWhitelist.value) {
+                if (!(CROP_TO_PLANTABLE.get(whitelist) == null) && (CROP_TO_PLANTABLE.get(whitelist)).equals(stack.getItem())) {
+                    whitelistedFarmlandPlantable.add(CROP_TO_PLANTABLE.get(whitelist));
+                }
+            }
+            return whitelistedFarmlandPlantable.contains(stack.getItem());
+        }
     }
 
     private boolean isBoneMeal(ItemStack stack) {
@@ -217,11 +260,46 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
     }
 
     private boolean isNetherWart(ItemStack stack) {
-        return !stack.isEmpty() && stack.getItem().equals(Items.NETHER_WART);
+        if (!Baritone.settings().farmEnableWhitelist.value) {
+            return !stack.isEmpty() && stack.getItem().equals(Items.NETHER_WART);
+        } else {
+            return !stack.isEmpty() && stack.getItem().equals(Items.NETHER_WART) && Baritone.settings().farmWhitelist.value.contains(Blocks.NETHER_WART);
+        }
     }
 
     private boolean isCocoa(ItemStack stack) {
-        return !stack.isEmpty() && stack.getItem().equals(Items.COCOA_BEANS);
+        if (!Baritone.settings().farmEnableWhitelist.value) {
+            return !stack.isEmpty() && stack.getItem().equals(Items.COCOA_BEANS);
+        } else {
+            return !stack.isEmpty() && stack.getItem().equals(Items.COCOA_BEANS) && Baritone.settings().farmWhitelist.value.contains(Blocks.COCOA);
+        }
+    }
+
+    private List<Goal> whereAreTheDrops() {
+        List<Goal> pickup = new ArrayList<>();
+        for (Entity entity : ctx.entities()) {
+            //check if the pickupGoals is out of range.
+            if (range != 0 && entity.blockPosition().distSqr(center) > range * range) {
+                continue;
+            }
+            if (entity instanceof ItemEntity && entity.onGround()) {
+                ItemEntity ei = (ItemEntity) entity;
+                if (PICKUP_DROPPED.contains(ei.getItem().getItem())) {
+                    if (!Baritone.settings().farmEnableWhitelist.value) {
+                        // +0.1 because of farmland's 0.9375 and soulsand's 0.875 dummy height lol
+                        pickup.add(new GoalBlock(new BetterBlockPos(entity.position().x, entity.position().y + 0.125, entity.position().z)));
+                    } else {
+                        for (Block whitelist : Baritone.settings().farmWhitelist.value) {
+                            if (!(CROP_TO_DROPPED.get(whitelist) == null) && (CROP_TO_DROPPED.get(whitelist)).contains(ei.getItem().getItem())) {
+                                // +0.1 because of farmland's 0.9375 and soulsand's 0.875 dummy height lol
+                                pickup.add(new GoalBlock(new BetterBlockPos(entity.position().x, entity.position().y + 0.125, entity.position().z)));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return pickup;
     }
 
     @Override
@@ -297,23 +375,11 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
         // Farm Continuously: Block input while paused
         if (!isPaused()) {
             // Check if item gather is prioritized
-            if (Baritone.settings().farmPrioritizeGather.value) {
-                List<Goal> pickupGoals = new ArrayList<>();
-                for (Entity entity : ctx.entities()) {
-                    //check if the pickupGoals is out of range.
-                    if (range != 0 && entity.blockPosition().distSqr(center) > range * range) {
-                        continue;
-                    }
-                    if (entity instanceof ItemEntity && entity.onGround()) {
-                        ItemEntity ei = (ItemEntity) entity;
-                        if (PICKUP_DROPPED.contains(ei.getItem().getItem())) {
-                            // +0.1 because of farmland's 0.9375 and soulsand's 0.875 dummy height lol
-                            pickupGoals.add(new GoalBlock(new BetterBlockPos(entity.position().x, entity.position().y + 0.125, entity.position().z)));
-                        }
-                    }
-                }
+            if (Baritone.settings().farmPrioritizePickup.value) {
+                List<Goal> pickupGoals = whereAreTheDrops();
                 if (!(pickupGoals.isEmpty())) {
-                    return new PathingCommand(new GoalComposite(pickupGoals.toArray(new Goal[0])), PathingCommandType.SET_GOAL_AND_PATH);
+                    GoalComposite pickupGoalComposite = new GoalComposite(pickupGoals.toArray(new Goal[0]));
+                    return new PathingCommand(pickupGoalComposite, PathingCommandType.SET_GOAL_AND_PATH);
                 }
             }
             baritone.getInputOverrideHandler().clearAllKeys();
@@ -428,18 +494,10 @@ public final class FarmProcess extends BaritoneProcessHelper implements IFarmPro
                 goalz.add(new GoalBlock(pos));
             }
         }
-        for (Entity entity : ctx.entities()) {
-            //check if the pickupGoals is out of range.
-            if (range != 0 && entity.blockPosition().distSqr(center) > range * range) {
-                continue;
-            }
-            if (entity instanceof ItemEntity && entity.onGround()) {
-                ItemEntity ei = (ItemEntity) entity;
-                if (PICKUP_DROPPED.contains(ei.getItem().getItem())) {
-                    // +0.1 because of farmland's 0.9375 and soulsand's 0.875 dummy height lol
-                    goalz.add(new GoalBlock(new BetterBlockPos(entity.position().x, entity.position().y + 0.125, entity.position().z)));
-                }
-            }
+        List<Goal> pickupGoals = whereAreTheDrops();
+        if (!(pickupGoals.isEmpty())) {
+            GoalComposite pickupGoalComposite = new GoalComposite(pickupGoals.toArray(new Goal[0]));
+            goalz.add(pickupGoalComposite);
         }
         if (goalz.isEmpty() && !isPaused()) {
             if (!Baritone.settings().farmContinuously.value) {

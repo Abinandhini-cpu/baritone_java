@@ -982,25 +982,43 @@ public final class Settings {
     public final Setting<Integer> farmMaxScanSize = new Setting<>(256);
 
     /**
-     * Prioritize gathering farm related drops
+     * Prioritize pickup crop drops before another farm task
      */
-    public final Setting<Boolean> farmPrioritizeGather = new Setting<>(false);
+    public final Setting<Boolean> farmPrioritizePickup = new Setting<>(false);
 
     /**
      * true = farm farm farm, i don't want to stop!
-            * false = allow farm to stop or fail
+     * false = allow farm to stop or fail
      */
     public final Setting<Boolean> farmContinuously = new Setting<>(false);
 
     /**
-     * How much farming task is enough for the Continuous Farm to resume?
+     * How much farm task queue is enough for Baritone to resume the continuous farm?
+     * {@link #farmContinuously}
      */
     public final Setting<Integer> farmContinuouslyThreshold = new Setting<>(16);
 
     /**
-     * Time interval (in seconds) for the Continuous Farm to check if threshold is fulfilled?
+     * How long Baritone should wait (in seconds) to check if continuous farm threshold is fulfilled?
+     * {@link #farmContinuously}
      */
     public final Setting<Long> farmContinuouslyIntervalSecs = new Setting<>(TimeUnit.MINUTES.toSeconds(2));
+
+    /**
+     * Farm whitelist, only interact with crop that is on the {@link #farmWhitelist} list
+     */
+    public final Setting<Boolean> farmEnableWhitelist = new Setting<>(false);
+
+    /**
+     * Crop block that Baritone is allowed to farm and collect
+     * {@link #farmEnableWhitelist}
+     */
+
+    public final Setting<List<Block>> farmWhitelist = new Setting<>(new ArrayList<>(Arrays.asList(
+            Blocks.WHEAT,
+            Blocks.POTATOES,
+            Blocks.CARROTS
+    )));
 
     /**
      * When the cache scan gives less blocks than the maximum threshold (but still above zero), scan the main world too.
