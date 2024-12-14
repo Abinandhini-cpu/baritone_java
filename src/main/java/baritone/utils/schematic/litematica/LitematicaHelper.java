@@ -29,6 +29,7 @@ import fi.dy.masa.litematica.world.WorldSchematic;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.util.Tuple;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
@@ -98,7 +99,7 @@ public final class LitematicaHelper {
         int minY = Integer.MAX_VALUE;
         int minZ = Integer.MAX_VALUE;
         HashMap<Vec3i, StaticSchematic> subRegions = new HashMap<>();
-        WorldSchematic schematicWorld = SchematicWorldHandler.getSchematicWorld();
+        Level schematicWorld = SchematicWorldHandler.getSchematicWorld();
         for (Map.Entry<String, SubRegionPlacement> entry : placement.getEnabledRelativeSubRegionPlacements().entrySet()) {
             SubRegionPlacement subPlacement = entry.getValue();
             Vec3i pos = transform(subPlacement.getPos(), placement.getMirror(), placement.getRotation());
